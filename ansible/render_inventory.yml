@@ -1,0 +1,16 @@
+---
+- name: Generate Ansible inventory
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars:
+    admin_username: azureuser
+    ssh_private_key_path: "{{ lookup('env', 'HOME') }}/.ssh/id_ed25519"
+
+  tasks:
+    - name: Generate inventory using Jinja2
+      ansible.builtin.template:
+        src: inventory.ini.j2
+        dest: "{{ playbook_dir }}/inventory.ini"
+        mode: "0600"

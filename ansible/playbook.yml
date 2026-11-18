@@ -1,0 +1,87 @@
+---
+- name: Configure the web server
+  hosts: web
+  become: true
+  gather_facts: false
+
+  vars:
+    project_title: "CC Assignment 3 - Reproducible Infrastructure"
+    project_description: >
+      A web application deployed using Terraform and
+      configured automatically using Ansible.
+    web_root: /var/www/cc-assignment-3
+    packages:
+      - nginx
+      - curl
+
+  tasks:
+    - name: Wait until the VM is reachable
+      ansible.builtin.wait_for_connection:
+        timeout: 300
+        sleep: 5
+
+    - name: Gather system information
+      ansible.builtin.setup:
+
+    - name: Update APT package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: present
+      loop: "{{ packages }}"
+
+    - name: Create website directory
+      ansible.builtin.file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    - name: Generate Nginx configuration
+      ansible.builtin.template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/cc-assignment-3
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Reload Nginx
+
+    - name: Enable our Nginx site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/cc-assignment-3
+        dest: /etc/nginx/sites-enabled/cc-assignment-3
+        state: link
+        owner: root
+        group: root
+      notify: Reload Nginx
+
+    - name: Remove default Nginx website
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload Nginx
+
+    - name: Generate website homepage
+      ansible.builtin.template:
+        src: templates/index.html.j2
+        dest: "{{ web_root }}/index.html"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Ensure Nginx is running and enabled
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
